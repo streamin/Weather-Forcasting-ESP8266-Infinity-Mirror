@@ -1,5 +1,5 @@
 # Weather-Forcasting-ESP8266-Infinity-Mirror
-An Infinity Mirror that displays current and forecasted weather information
+An WiFi connected Infinity Mirror that displays current and forecasted weather information by manipulating the hue, saturation, and brightness of NeoPixels. 
 
 An infinity mirror with an arbitrary number of panes.
 Each pane has an equal but arbitrary number of NeoPixels.
