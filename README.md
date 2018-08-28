@@ -11,4 +11,4 @@ Wind Angle is represented by a single NeoPixel whose position on the perimeter o
 Wind Speed is represented by the saturation of the Wind Angle NeoPixel.
 Percipitation is represented by a twinkling effect (changing brightness of the NeoPixels).
 
-As the weather forcast is updated there are smooth transitions in the appearence of the NeoPixels. All weather data is relative to the seasonal averages to create patterns that change hourly. Without this feature the patterns would only change with the season.
+As the weather forecast is updated there are smooth transitions in the appearence of the NeoPixels. All weather data is relative to the seasonal averages to create patterns that change hourly. Without this feature the patterns would only change with the season.
