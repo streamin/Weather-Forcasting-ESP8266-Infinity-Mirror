@@ -1,4 +1,4 @@
-# Weather-Forcasting-ESP8266-Infinity-Mirror
+# Weather Forcasting ESP8266 Infinity Mirror
 A WiFi connected Infinity Mirror that displays current and forecasted weather information with NeoPixels. Writen with the Arduino IDE.
 
 The infinity mirror has an arbitrary number of panes.
