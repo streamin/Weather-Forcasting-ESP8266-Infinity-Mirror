@@ -286,8 +286,8 @@ void FadeLEDs() {
     yield();
       
     for (uint8_t i=0; i < Panes; i++) {
-      // Previously this was done with interpolation but that was a whole bunch of math and it was slooooow. The modified Bresenham's line algorithm is much faster.
-      
+      // Previously this was done with interpolation but that was a whole bunch of math and it was slooooow.
+      // The modified Bresenham's line algorithm is much faster.
       // Modified Bresenham's line algorithm begins. Replaced "if" with "while" so slopes greater than one can be accomadated.
       HueError[i] -= HueDelta[i];
       while (HueError[i] < 0) { HueCurrent[i] += HueSign[i]; HueError[i] += FadeSteps; }
