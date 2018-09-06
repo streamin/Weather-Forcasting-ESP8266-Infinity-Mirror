@@ -66,7 +66,7 @@ NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
  *  **********************************************************************************/
 
 
-void GetCurrent() { // size of array is already global const "Panes"
+void GetCurrent() {
   // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/WiFiClient/WiFiClient.ino
   // https://arduinojson.org/v5/example/parser/
   // https://gist.github.com/bbx10/149bba466b1e2cd887bf
