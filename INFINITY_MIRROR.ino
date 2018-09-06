@@ -66,7 +66,7 @@ NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
  *  **********************************************************************************/
 
 
-void GetCurrent() {
+void GetCurrent() { // gets the current weather from the api
   // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/WiFiClient/WiFiClient.ino
   // https://arduinojson.org/v5/example/parser/
   // https://gist.github.com/bbx10/149bba466b1e2cd887bf
@@ -159,7 +159,7 @@ void GetCurrent() {
   }
 }
 
-void GetForecast() {
+void GetForecast() { // gets the forecasted weather from the api
   // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/WiFiClient/WiFiClient.ino
   // https://arduinojson.org/v5/example/parser/
   // https://gist.github.com/bbx10/149bba466b1e2cd887bf
