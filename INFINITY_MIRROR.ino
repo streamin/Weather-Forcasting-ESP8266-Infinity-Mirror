@@ -55,6 +55,7 @@ char respBuf[httpBuffSize]; // this is very big. crashes unless i declare it a g
 
 bool FirstPass = true;
 bool IsForecast = false;
+
 // pixel colours
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
 //NeoPixelBus<NeoRgbFeature, Neo400KbpsMethod> strip(PixelCount, PixelPin);
@@ -380,7 +381,7 @@ void SetTargets() {
   float MinTemp =  NormalLow[k] *(1-Weight) + NormalLow[k-1] *Weight - OffsetTemp;
   float MaxWind =  NormalWind[k]*(1-Weight) + NormalWind[k-1]*Weight;
   float MaxRain = (NormalRain[k]*(1-Weight) + NormalRain[k-1]*Weight)*RainMulti;
-  /*
+  
   Serial.println(F("Relative Weather"));
   Serial.print(F("      Day: ")); Serial.println(Day);
   //Serial.print(F("Day Index: ")); Serial.println(k);
@@ -391,7 +392,7 @@ void SetTargets() {
   Serial.print(F(" Max Wind: ")); Serial.print(MaxWind); Serial.println(F("m/s"));
   Serial.print(F(" Max Rain: ")); Serial.print(MaxRain); Serial.println(F("mm"));
   Serial.println();
-  */
+  
   for (int8_t i=0; i < Panes; i++) {
     // Save the previous targets as the new current values
     HueCurrent[i] = HueTarget[i];
