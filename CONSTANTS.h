@@ -13,8 +13,8 @@ const char* WiFiPSK   = "your_password";
 const int16_t FramePeriod   = 80; // [ms] Refresh period of LEDs
 const int8_t  TwinkleFrames = 8;  // frames for LED to resume full brightness after twinkling 
 const int8_t  MaxTwinkProb  = 90; // [%]  Probability one LED will twinkle at MaxRain
-const int16_t FadeSteps     = 25;//100;  //
-const int16_t FramesPerStep = 50;//450;  // FramePeriod*FadeSteps*FramesPerStep ~= 3,600,000ms = 60min between GET requests
+const int16_t FadeSteps     = 100;  //
+const int16_t FramesPerStep = 450;  // FramePeriod*FadeSteps*FramesPerStep ~= 3,600,000ms = 60min between GET requests
 const int8_t  OffsetTemp    = 2;    // [°C] degrees to offset normal seasonal highs and lows
 const float   RainMulti     = 1.5;  // Rain multiplier. Rainfall numbers are average daily amount. Forecast interval is 3h. Assume all daily rain falls during only 2h of the day: RainMulti = forecast_interval/rain_duration = 3/2
 
