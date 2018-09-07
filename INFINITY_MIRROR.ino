@@ -399,7 +399,7 @@ void SetTargets() {
     BriCurrent[i] = BriTarget[i];
     TwiCurrent[i] = TwiTarget[i];
     SatCurrent[i] = SatTarget[i];
-    AngCurrent[i] = AngTarget[i];
+    AngCurrent[i] = AngTarget[i] % 360; // AngCurrent should be between 0 and 359 until we decide it shouldn't be
     
     // *** Convert temperature to hue ***
     // MaxTemp --> MinHue, MinTemp --> MaxHue
