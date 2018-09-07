@@ -409,7 +409,7 @@ void SetTargets() {
 
     // *** Convert rain and snow to brightness and twinkle probability ***
     // convert snow depth to rain depth
-    if (SnowDepth[i] > 0) { // If the json value doesn't exist will this be null, zero, or the previous value? will have to test
+    if (SnowDepth[i] > 0) { // If the json value doesn't exist this will be zero.
       int8_t j = 1;  // start at 1 in case SnowTemp is out of range.
       while (SnowTemp[j] > Temperature[i]) {
         j++;
