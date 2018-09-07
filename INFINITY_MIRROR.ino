@@ -53,8 +53,8 @@ int16_t TwinkleIndex = 0;   // position in the twinkle buffer
 // http response buffer
 char respBuf[httpBuffSize]; // this is very big. crashes unless i declare it a global
 
-bool FirstPass = true;
-bool IsForecast = false;
+bool FirstPass    = true;
+bool AreForecasts = false;
 
 // pixel colours
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
@@ -476,7 +476,7 @@ void SetTargets() {
 void setup() {
   for (int8_t i=0; i < Panes; i++) {
     if (WeatherInterval[i] >= 0) {
-      IsForecast = true;
+      AreForecasts = true;
     }
   }
   Serial.begin(115200); delay(1000);
@@ -488,7 +488,7 @@ void setup() {
 void loop() {
   ConnectWiFi();      // Check WiFi connection
   GetCurrent();       // get UNIX time and current weather data
-  if (IsForecast == true) {
+  if (AreForecasts == true) {
     GetForecast();  // get forecast weather data
   }
   PrintAPIData();
