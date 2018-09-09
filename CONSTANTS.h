@@ -16,7 +16,7 @@ const int8_t  MaxTwinkProb  = 90; // [%]  Probability one LED will twinkle at Ma
 const int16_t FadeSteps     = 100;  //
 const int16_t FramesPerStep = 450;  // FramePeriod*FadeSteps*FramesPerStep ~= 3,600,000ms = 60min between GET requests
 const int8_t  OffsetTemp    = 2;    // [°C] degrees to offset normal seasonal highs and lows
-const float   RainMulti     = 1.5;  // Rain multiplier. Rainfall numbers are average daily amount. Forecast interval is 3h. Assume all daily rain falls during only 2h of the day: RainMulti = forecast_interval/rain_duration = 3/2
+const float   RainMulti     = 0.25;  // Rain multiplier. Rainfall numbers are average daily amount. Forecast interval is 3h. Assume all daily rain falls during 12h period: RainMulti = forecast_interval/rain_duration = 3/12
 
 const int32_t httpBuffSize  = (18*1024); // potential number of chars in GET response
 const int32_t jsonBuffSize  = (21*1024); // 21*1024 seems to work
