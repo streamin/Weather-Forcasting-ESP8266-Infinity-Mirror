@@ -1,13 +1,12 @@
 #include <ESP8266WiFi.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <NeoPixelBus.h>
-#include "CONSTANTS.h"
+#include "MyCONSTANTS.h"
 
+//#define DEBUG
 
-/*  **********************************************************************************
- *  ********************************* Global Variables *******************************
- *  **********************************************************************************/
-
+/********************************** Global Variables *******************************/
  
 int16_t HueDelta[Panes]; // Hue of LEDs (temperature)
 int16_t HueTarget[Panes];
@@ -16,19 +15,19 @@ int8_t  HueSign[Panes];
 int16_t HueError[Panes];
 
 int8_t  BriDelta[Panes]; // Low brightness of twinkling LEDs (rain)
-int8_t  BriTarget[Panes];
+int16_t BriTarget[Panes];
 int8_t  BriCurrent[Panes];
 int8_t  BriSign[Panes];
 int16_t BriError[Panes];
 
 int8_t  TwiDelta[Panes];  // Probability an LED will Twinkle (rain)
-int8_t  TwiTarget[Panes];
+int16_t TwiTarget[Panes];
 int8_t  TwiCurrent[Panes];
 int8_t  TwiSign[Panes];
 int16_t TwiError[Panes];
 
 int8_t  SatDelta[Panes]; // Saturation of wind LED (wind speed)
-int8_t  SatTarget[Panes];
+int16_t SatTarget[Panes];
 int8_t  SatCurrent[Panes];
 int8_t  SatSign[Panes];
 int16_t SatError[Panes];
@@ -43,238 +42,120 @@ int16_t WindLED[Panes]; // Index of wind LED
 float   Temperature[Panes];  // API variables
 float   WindSpeed[Panes];
 float   WindBearing[Panes];
-float   RainDepth[Panes];
-float   SnowDepth[Panes];
+float   PrecipProb[Panes];
 uint32_t UNIXTime; // int64_t will not compile. use uint32_t, will work till year 2106. int32_t will work till year 2038
 
 int16_t TwinkleBuffer[TwinkleFrames*Panes];  // ring buffer. position in ring determines stage of twinkling
 int16_t TwinkleIndex = 0;   // position in the twinkle buffer
 
-// http response buffer
-char respBuf[httpBuffSize]; // this is very big. crashes unless i declare it a global
+bool FirstPass = true;
 
-bool FirstPass    = true;
-bool AreForecasts = false;
-
-// pixel colours
+// initialize pixels
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, Neo400KbpsMethod> strip(PixelCount, PixelPin);
 
+/********************************** Functions **************************************/
 
-/*  **********************************************************************************
- *  ********************************* Functions **************************************
- *  **********************************************************************************/
+void GetWeather() { // gets the weather from the api
+  WiFiClientSecure client;
 
-
-void GetCurrent() { // gets the current weather from the api
-  // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/WiFiClient/WiFiClient.ino
-  // https://arduinojson.org/v5/example/parser/
-  // https://gist.github.com/bbx10/149bba466b1e2cd887bf
-  
-  WiFiClient client;
-  
   // Connect to host
-  //Serial.print("connecting to "); Serial.println(API_HOST);
-  if (!client.connect(API_HOST, 80)) {
-    Serial.println("connection failed");
+  if (!client.connect(APIHost, 443)) {
+    #ifdef DEBUG
+    Serial.println(F("! Connection failed !")); Serial.println();
+    #endif
     return;
   }
   
-  // Send current weather GET Request
-  Serial.println("Sending GET request for current weather...");
-  client.print(String("GET ") + URL_CURRENT + " HTTP/1.1\r\n" +
-               "Host: " + API_HOST + "\r\n" +
+  // Send GET Request
+  client.print(String("GET ") + APIURL + " HTTP/1.1\r\n" +
+               "Host: " + APIHost + "\r\n" +
                "User-Agent: ESP8266\r\n" +
                "Connection: close\r\n\r\n");
   
   // Timeout if no response
   uint32_t timeout = millis();
   while (!client.connected() && !client.available()) {
-  //while (!client.connected() || !client.available()) {
-  //while (client.available() == 0) {
-    if (millis() - timeout > 10000) {
-      Serial.println(">>> Client Timeout !");
+    if (millis() - timeout > 5000) {
+      #ifdef DEBUG
+      Serial.println(F("! Client timeout !"));
+      #endif
       client.stop();
       return;
     }
   }
   
-  int32_t respLen = 0;
-  bool skip_headers = true;
-  while (client.connected() || client.available()) {
-    if (skip_headers) {
-      String aLine = client.readStringUntil('\n');
-      //Serial.println(aLine);
-      // Blank line denotes end of headers
-      if (aLine.length() <= 1) {
-        skip_headers = false;
-      }
-    } else {
-      int16_t bytesIn;
-      bytesIn = client.read((uint8_t *)&respBuf[respLen], /*sizeof(respBuf)*/httpBuffSize - respLen);
-      if (bytesIn > 0) {
-        respLen += bytesIn;
-        //Serial.print(F("Bytes in ")); Serial.println(bytesIn);
-      } else if (bytesIn < 0) {
-        Serial.print(F("Read error ")); Serial.println(bytesIn);
-        return;
+  if (client.find("\"currently\":")) {    // skips the headers and anything else before
+    StaticJsonBuffer<jsonSize> jsonBuffer;
+    JsonObject& interval = jsonBuffer.parseObject(client);
+    if (interval.success()) {
+      UNIXTime = interval["time"];
+      int8_t j = WeatherIntervalIndex(0);  // find the index of value 0 in WeatherInterval[];
+      if (j >= 0) {
+        Temperature[j]  = interval["temperature"];
+        WindSpeed[j]    = interval["windSpeed"];
+        WindBearing[j]  = interval["windBearing"];
+        PrecipProb[j]   = interval["precipProbability"];
       }
     }
-    delay(1);
+  }
+  
+  if (client.find("\"hourly\":")) { // skips the headers and anything else before
+    client.find('[');               // skips to the first item in the interval data list
+    client.find("},");              // advance to the next interval because we've already addressed 0
+    for (int8_t i=1; i < 49; i++) { // 1 to 48 intervals of forecast
+      int8_t j = WeatherIntervalIndex(i);  // find the index of value i in WeatherInterval[];
+      if (j >= 0) {
+        StaticJsonBuffer<jsonSize> jsonBuffer;
+        JsonObject& interval = jsonBuffer.parseObject(client);
+        if (interval.success()) {
+          Temperature[j]  = interval["temperature"];
+          WindSpeed[j]    = interval["windSpeed"];
+          WindBearing[j]  = interval["windBearing"];
+          PrecipProb[j]   = interval["precipProbability"];
+        }
+      } else {
+        client.find("},"); // advance to the next interval
+      }
+    }
   }
   client.stop();
   
-  if (respLen >= /*sizeof(respBuf)*/ httpBuffSize) {
-    Serial.println(F("Response buffer overflow"));
-    return;
-  }
-  
-  // Terminate the C string
-  respBuf[respLen++] = '\0';
-  //Serial.print(F("Length:   ")); Serial.println(respLen);
-  Serial.print(F("Response: ")); Serial.println(respBuf);
-  Serial.println();
-  
-  // Allocate JsonBuffer
-  DynamicJsonBuffer jsonBuffer(jsonBuffSize);
-  // https://arduinojson.org/v5/faq/what-are-the-differences-between-staticjsonbuffer-and-dynamicjsonbuffer/
-  
-  // Parse JSON object
-  JsonObject& root = jsonBuffer.parseObject(respBuf);
-  if (!root.success()) {
-    Serial.println(F("Parsing failed!")); Serial.println();
-    return;
-  }
-  
-  // Extract values
-  UNIXTime = root["dt"];
-  for (int8_t i=0; i < Panes; i++) {
-    if (WeatherInterval[i] < 0) {
-      Temperature[i]  = root["main"]["temp"];
-      WindSpeed[i]    = root["wind"]["speed"];
-      WindBearing[i]  = root["wind"]["deg"];
-      RainDepth[i]    = root["rain"]["3h"];  // if this doesn't exist it will be zero.
-      SnowDepth[i]    = root["snow"]["3h"];  // if this doesn't exist it will be zero.
-    }
-  }
-}
+  // deal with duplicate panes
+  DuplicatePanes();
 
-void GetForecast() { // gets the forecasted weather from the api
-  // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/WiFiClient/WiFiClient.ino
-  // https://arduinojson.org/v5/example/parser/
-  // https://gist.github.com/bbx10/149bba466b1e2cd887bf
-  
-  WiFiClient client;
-  
-  // Connect to host
-  //Serial.print("connecting to "); Serial.println(API_HOST);
-  if (!client.connect(API_HOST, 80)) {
-    Serial.println("connection failed");
-    return;
-  }
-  
-  // Send current weather GET Request
-  Serial.println("Sending GET request for forecast weather...");
-  client.print(String("GET ") + URL_FORECAST + " HTTP/1.1\r\n" +
-               "Host: " + API_HOST + "\r\n" +
-               "User-Agent: ESP8266\r\n" +
-               "Connection: close\r\n\r\n");
-  
-  // Timeout if no response
-  uint32_t timeout = millis();
-  while (!client.connected() && !client.available()) {
-  //while (!client.connected() || !client.available()) {
-  //while (client.available() == 0) {
-    if (millis() - timeout > 10000) {
-      Serial.println(">>> Client Timeout !");
-      client.stop();
-      return;
-    }
-  }
-  
-  int32_t respLen = 0;
-  bool skip_headers = true;
-  while (client.connected() || client.available()) {
-    if (skip_headers) {
-      String aLine = client.readStringUntil('\n');
-      //Serial.println(aLine);
-      // Blank line denotes end of headers
-      if (aLine.length() <= 1) {
-        skip_headers = false;
-      }
-    } else {
-      int16_t bytesIn;
-      bytesIn = client.read((uint8_t *)&respBuf[respLen], /*sizeof(respBuf)*/httpBuffSize - respLen);
-      if (bytesIn > 0) {
-        respLen += bytesIn;
-        //Serial.print(F("Bytes in ")); Serial.println(bytesIn);
-      } else if (bytesIn < 0) {
-        Serial.print(F("Read error ")); Serial.println(bytesIn);
-        return;
-      }
-    }
-    delay(1);
-  }
-  client.stop();
-  
-  if (respLen >= /*sizeof(respBuf)*/ httpBuffSize) {
-    Serial.println(F("Response buffer overflow"));
-    return;
-  }
-  
-  // Terminate the C string
-  respBuf[respLen++] = '\0';
-  //Serial.print(F("Length:   ")); Serial.println(respLen);
-  Serial.print(F("Response: ")); Serial.println(respBuf);
-  Serial.println();
-  
-  // Allocate JsonBuffer
-  DynamicJsonBuffer jsonBuffer(jsonBuffSize);
-  // https://arduinojson.org/v5/faq/what-are-the-differences-between-staticjsonbuffer-and-dynamicjsonbuffer/
-  
-  // Parse JSON object
-  JsonObject& root = jsonBuffer.parseObject(respBuf);
-  if (!root.success()) {
-    Serial.println(F("Parsing failed!")); Serial.println();
-    return;
-  }
-  
-  // Extract values
-  for (int8_t i=0; i < Panes; i++) {
-    if (WeatherInterval[i] >= 0) {
-      Temperature[i]  = root["list"][WeatherInterval[i]]["main"]["temp"];
-      WindSpeed[i]    = root["list"][WeatherInterval[i]]["wind"]["speed"];
-      WindBearing[i]  = root["list"][WeatherInterval[i]]["wind"]["deg"];
-      RainDepth[i]    = root["list"][WeatherInterval[i]]["rain"]["3h"];  // if this doesn't exist it will be zero.
-      SnowDepth[i]    = root["list"][WeatherInterval[i]]["snow"]["3h"];  // if this doesn't exist it will be zero.
-    }
-  }
-}
-
-void PrintAPIData() {
+  #ifdef DEBUG
   Serial.println(F("API Data"));
   Serial.print(F("     UNIX Time: ")); Serial.println(UNIXTime);
   for (int8_t i=0; i < Panes; i++) {
     Serial.print(F(" Temperature ")); Serial.print(i); Serial.print(F(": ")); Serial.print(Temperature[i]); Serial.println(F("°C"));
     Serial.print(F("  Wind Speed ")); Serial.print(i); Serial.print(F(": ")); Serial.print(WindSpeed[i]);   Serial.println(F("m/s"));
     Serial.print(F("Wind Bearing ")); Serial.print(i); Serial.print(F(": ")); Serial.print(WindBearing[i]); Serial.println(F("°"));
-    Serial.print(F("  Rain Depth ")); Serial.print(i); Serial.print(F(": ")); Serial.print(RainDepth[i]);   Serial.println(F("mm"));
-    Serial.print(F("  Snow Depth ")); Serial.print(i); Serial.print(F(": ")); Serial.print(SnowDepth[i]);   Serial.println(F("mm"));
+    Serial.print(F("      P.o.P. ")); Serial.print(i); Serial.print(F(": ")); Serial.print(100*PrecipProb[i]);  Serial.println(F("%"));
   }
   Serial.println();
+  #endif
 }
 
-void PrintFadeData(int16_t j) {
-  Serial.print(F("Step ")); Serial.print(j); Serial.println(F(" Fade Data"));
-  for (int8_t i=0; i < Panes; i++) {
-    Serial.print(F("       Hue ")); Serial.print(i); Serial.print(F(": ")); Serial.println(HueCurrent[i]);
-    Serial.print(F("Brightness ")); Serial.print(i); Serial.print(F(": ")); Serial.print(BriCurrent[i]); Serial.println(F("%"));
-    Serial.print(F("   Twinkle ")); Serial.print(i); Serial.print(F(": ")); Serial.print(TwiCurrent[i]); Serial.println(F("%"));
-    Serial.print(F("Saturation ")); Serial.print(i); Serial.print(F(": ")); Serial.print(SatCurrent[i]); Serial.println(F("%"));
-    Serial.print(F("Wind Angle ")); Serial.print(i); Serial.print(F(": ")); Serial.print(AngCurrent[i]); Serial.println(F("°"));
-    Serial.print(F("  Wind LED ")); Serial.print(i); Serial.print(F(": ")); Serial.println(WindLED[i]);
+int8_t WeatherIntervalIndex(int8_t element) {
+  for (int8_t i = 0; i < Panes; i++) {
+    if (WeatherInterval[i] == element) {
+      return i;
+    }
   }
-  Serial.println();
+  return -1;
+}
+
+void DuplicatePanes() {
+  for (int8_t i = 0; i < Panes; i++) {
+    for (int8_t j = i+1; j < Panes; j++) {
+      if (WeatherInterval[j] == WeatherInterval[i]) {
+        Temperature[j]  = Temperature[i];
+        WindSpeed[j]    = WindSpeed[i];
+        WindBearing[j]  = WindBearing[i];
+        PrecipProb[j]   = PrecipProb[i];
+      }
+    }
+  }
 }
 
 void FadeLEDs() {
@@ -319,8 +200,19 @@ void FadeLEDs() {
       // Set the wind indicator LED
       strip.SetPixelColor(WindLED[i], HsbColor(HueCurrent[i]/360.0f, SatCurrent[i]/100.0f, MaxBri/100.0f));
     }
-
-    PrintFadeData(j);
+    
+    #ifdef DEBUG
+    Serial.print(F("Step ")); Serial.print(j+1); Serial.print(F(" of ")); Serial.println(FadeSteps);
+    for (int8_t i=0; i < Panes; i++) {
+      Serial.print(F("       Hue ")); Serial.print(i); Serial.print(F(": ")); Serial.println(HueCurrent[i]);
+      Serial.print(F("Brightness ")); Serial.print(i); Serial.print(F(": ")); Serial.print(BriCurrent[i]); Serial.println(F("%"));
+      Serial.print(F("   Twinkle ")); Serial.print(i); Serial.print(F(": ")); Serial.print(TwiCurrent[i]); Serial.println(F("%"));
+      Serial.print(F("Saturation ")); Serial.print(i); Serial.print(F(": ")); Serial.print(SatCurrent[i]); Serial.println(F("%"));
+      Serial.print(F("Wind Angle ")); Serial.print(i); Serial.print(F(": ")); Serial.print(AngCurrent[i]); Serial.println(F("°"));
+      Serial.print(F("  Wind LED ")); Serial.print(i); Serial.print(F(": ")); Serial.println(WindLED[i]);
+    }
+    Serial.println();
+    #endif
     
     // Twinkle the LEDs 
     for (int16_t i=0; i < FramesPerStep; i++) {
@@ -360,38 +252,37 @@ void TwinkleLEDs() {
 
   // Advance the circular buffer
   TwinkleIndex = (TwinkleIndex + 1) % TwinkleFrames;
-  //Serial.print(F("beep"));
+
+  // push data to LEDs
   strip.Show();
-  //Serial.println(F(" beep"));
+
+  // delay for frame period
   delay(FramePeriod);
 }
 
 void SetTargets() {
-  // *** Set seasonal weather limits ***
-  int16_t Day = (UNIXTime % SecInYear)/SecInDay; // This doesn't need to be super accurate. Leap years are accounted for in SecInYear.
+  // Determine the day of the year
+  int16_t Day = (UNIXTime % 31556952)/86400; // This doesn't need to be super accurate. Leap years are accounted for in SecInYear. SecInYear = 365.2425*24*60*60 = 31556952. SecInDay = 24*60*60 = 86400.
   
   int16_t k = 1;
   while (NormalDay[k] < Day) {
     k++;
   }
-  
+
+  // Set seasonal temp limits
   // Interpolate between (k-1) and k
   float Weight  = ((NormalDay[k]-Day)*1.0f)/(NormalDay[k]-NormalDay[k-1]);
   float MaxTemp =  NormalHigh[k]*(1-Weight) + NormalHigh[k-1]*Weight + OffsetTemp;
   float MinTemp =  NormalLow[k] *(1-Weight) + NormalLow[k-1] *Weight - OffsetTemp;
-  float MaxWind =  NormalWind[k]*(1-Weight) + NormalWind[k-1]*Weight;
-  float MaxRain = (NormalRain[k]*(1-Weight) + NormalRain[k-1]*Weight)*RainMulti;
-  
-  Serial.println(F("Relative Weather"));
-  Serial.print(F("      Day: ")); Serial.println(Day);
-  //Serial.print(F("Day Index: ")); Serial.println(k);
-  //Serial.print(F("   Weight: ")); Serial.println(Weight);
-  //Serial.print(F(" 1-Weight: ")); Serial.println((1-Weight));
-  Serial.print(F(" Max Temp: ")); Serial.print(MaxTemp); Serial.println(F("°C"));
-  Serial.print(F(" Min Temp: ")); Serial.print(MinTemp); Serial.println(F("°C"));
-  Serial.print(F(" Max Wind: ")); Serial.print(MaxWind); Serial.println(F("m/s"));
-  Serial.print(F(" Max Rain: ")); Serial.print(MaxRain); Serial.println(F("mm"));
+
+  #ifdef DEBUG
+  Serial.println(F("Weather Limits"));
+  Serial.print(F("     Day: ")); Serial.println(Day);
+  Serial.print(F("Max Temp: ")); Serial.print(MaxTemp); Serial.println(F("°C"));
+  Serial.print(F("Min Temp: ")); Serial.print(MinTemp); Serial.println(F("°C"));
+  Serial.print(F("Max Wind: ")); Serial.print(MaxWind); Serial.println(F("m/s"));
   Serial.println();
+  #endif
   
   for (int8_t i=0; i < Panes; i++) {
     // Save the previous targets as the new current values
@@ -399,40 +290,32 @@ void SetTargets() {
     BriCurrent[i] = BriTarget[i];
     TwiCurrent[i] = TwiTarget[i];
     SatCurrent[i] = SatTarget[i];
-    AngCurrent[i] = AngTarget[i] % 360; // AngCurrent should be between 0 and 359 until we decide it shouldn't be
+    AngCurrent[i] = AngTarget[i] % 360; // AngCurrent should be between 0 and 359 until we decide if it shouldn't be
     
-    // *** Convert temperature to hue ***
+    // Convert temperature to hue
     // MaxTemp --> MinHue, MinTemp --> MaxHue
-    HueTarget[i] = MaxHue - ((Temperature[i]-MinTemp)*(MaxHue-MinHue))/(MaxTemp-MinTemp);
+    HueTarget[i] = ((Temperature[i]-MinTemp)/(MaxTemp-MinTemp))*(MinHue-MaxHue) + MaxHue;
     if (HueTarget[i] < MinHue) { HueTarget[i] = MinHue; }
     else if (HueTarget[i] > MaxHue) { HueTarget[i] = MaxHue; }
 
-    // *** Convert rain and snow to brightness and twinkle probability ***
-    // convert snow depth to rain depth
-    if (SnowDepth[i] > 0) { // If the json value doesn't exist this will be zero.
-      int8_t j = 1;  // start at 1 in case SnowTemp is out of range.
-      while (SnowTemp[j] > Temperature[i]) {
-        j++;
-      }
-      // Interpolate and add normalized snow depth to rain depth
-      RainDepth[i] = RainDepth[i] + ((Temperature[i]-SnowTemp[j])*(Snow2Rain[j-1]-Snow2Rain[j])/(SnowTemp[j-1]-SnowTemp[j])+Snow2Rain[j])*SnowDepth[i];
-    }
-    
-    // No Rain --> MaxBri, MaxRain --> MinBri
-    BriTarget[i] = (RainDepth[i]*(MinBri-MaxBri))/MaxRain + MaxBri;
-    if (BriTarget[i] > MaxBri) { BriTarget[i] = MaxBri; }
-    else if (BriTarget[i] < MinBri) { BriTarget[i] = MinBri; }
+    // Convert precipitation probability to brightness and twinkle probability
+    // No Rain --> HiMinBri, MaxRain --> LoMinBri
+    BriTarget[i] = PrecipProb[i]*(LoMinBri-HiMinBri) + HiMinBri;
+    //if (BriTarget[i] > HiMinBri) { BriTarget[i] = HiMinBri; }
+    //else if (BriTarget[i] < LoMinBri) { BriTarget[i] = LoMinBri; }
 
     // No Rain --> No Twinkle, MaxRain --> MaxTwinkProb
-    TwiTarget[i] = RainDepth[i]*MaxTwinkProb/MaxRain;
-    if (TwiTarget[i] > MaxTwinkProb) { TwiTarget[i] = MaxTwinkProb; }
-
-    // *** Convert wind speed to saturation and wind bearing to wind angle***
-    // 0kph Wind --> MaxSat, MaxWind --> MinSat
-    SatTarget[i] = (WindSpeed[i]*(MinSat-MaxSat))/MaxWind + MaxSat;
-    if (SatTarget[i] > MaxSat) { SatTarget[i] = MaxSat; }
-    else if (SatTarget[i] < MinSat) { SatTarget[i] = MinSat; }
+    TwiTarget[i] = PrecipProb[i]*MaxTwinkProb;
+    //if (TwiTarget[i] > MaxTwinkProb) { TwiTarget[i] = MaxTwinkProb; }
+    //else if (TwiTarget[i] < 0) { TwiTarget[i] = 0; }
     
+    // Convert wind speed to saturation
+    // 0kph Wind --> MaxSat, MaxWind --> MinSat
+    SatTarget[i] = (WindSpeed[i]/MaxWind)*(MinSat-MaxSat) + MaxSat;
+    if (SatTarget[i] > MaxSat) { SatTarget[i] = MaxSat; }
+    //else if (SatTarget[i] < MinSat) { SatTarget[i] = MinSat; }
+
+    // Convert wind bearing to wind angle
     // If the wind changes from 1 degree to 359 degress or vice-versa we want to interpolate the shortest distance around the circle: 1-->0-->359 or 359-->0-->1
     // So we add 360 to either the target or the current value: 361-->360-->359 or 359-->360-->361
     AngTarget[i] = WindBearing[i];
@@ -470,40 +353,48 @@ void SetTargets() {
     SatError[i] = 0;
     AngError[i] = 0;
   }
+  
   FirstPass = false;
-}
-
-void setup() {
-  for (int8_t i=0; i < Panes; i++) {
-    if (WeatherInterval[i] >= 0) {
-      AreForecasts = true;
-    }
-  }
-  Serial.begin(115200); delay(1000);
-  ConnectWiFi(); // Check WiFi connection
-  strip.Begin();
-  delay(1000);
 }
 
 void loop() {
   ConnectWiFi();      // Check WiFi connection
-  GetCurrent();       // get UNIX time and current weather data
-  if (AreForecasts == true) {
-    GetForecast();  // get forecast weather data
-  }
-  PrintAPIData();
+  GetWeather();       // get UNIX time and weather data
   SetTargets();       // Set targets and initialize parameters for fade
-  FadeLEDs();         // Smooth transition of the LEDs
+  FadeLEDs();         // animate the LEDs and yeild()
+}
+
+void setup() {
+  #ifdef DEBUG
+  Serial.begin(115200); delay(1000);
+  Serial.println(F("Fade Settings"));
+  Serial.print(F("FramePeriod:   ")); Serial.println(FramePeriod);
+  Serial.print(F("TwinkleFrames: ")); Serial.println(TwinkleFrames);
+  Serial.print(F("MaxTwinkProb:  ")); Serial.println(MaxTwinkProb);
+  Serial.print(F("FramesPerStep: ")); Serial.println(FramesPerStep);
+  Serial.println();
+  #endif
+  
+  // Set WiFi to station mode and disconnect from an AP if it was previously connected
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  ConnectWiFi(); // Check WiFi connection
+  strip.Begin();
+  delay(1000);
 }
 
 void ConnectWiFi() {
   if (WiFi.status() != WL_CONNECTED) {
     WiFi.begin(WiFiSSID, WiFiPSK);
     while (WiFi.status() != WL_CONNECTED) {
-      //Serial.print(F("."));
+      #ifdef DEBUG
+      Serial.print(F("."));
+      #endif
       delay(500);
     }
-    //Serial.println(F(" Connected!"));
-    //Serial.println();
+    #ifdef DEBUG
+    Serial.println(F(" WiFi connected")); Serial.println();
+    #endif
   }
 }
