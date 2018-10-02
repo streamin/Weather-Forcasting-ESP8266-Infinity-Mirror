@@ -2,7 +2,7 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <NeoPixelBus.h>
-#include "MyCONSTANTS.h"
+#include "CONSTANTS.h"
 
 //#define DEBUG
 
