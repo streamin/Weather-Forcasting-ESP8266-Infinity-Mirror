@@ -271,9 +271,9 @@ void SetTargets() {
 
   // Set seasonal temp limits
   // Interpolate between (k-1) and k
-  float MaxTemp  = (((Day-NormalDay[k])*1.0f) * (NormalTemp[k]-NormalTemp[k-1]) / (NormalDay[k]-NormalDay[k-1])) + NormalTemp[k];
-  float MinTemp  =  MaxTemp - OffsetTemp;
-  MaxTemp        =  MaxTemp + OffsetTemp;
+  float MaxTemp = (((Day-NormalDay[k])*1.0f) * (NormalTemp[k]-NormalTemp[k-1]) / (NormalDay[k]-NormalDay[k-1])) + NormalTemp[k];
+  float MinTemp = MaxTemp - OffsetTemp;
+  MaxTemp       = MaxTemp + OffsetTemp;
 
   #ifdef DEBUG
   Serial.println(F("Weather Limits"));
