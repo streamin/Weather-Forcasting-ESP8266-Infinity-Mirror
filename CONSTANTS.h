@@ -27,7 +27,7 @@ const int16_t MaxHue  = 240;  // colour of MinTemp
 const int8_t  MaxSat  = 100;  // 0 to 100, keep at 100, 0 is white, 100 is full colour
 const int8_t  MinSat  = 0;    // 0 to 100, keep at 0, saturation at MaxWind
 
-const int8_t   MaxBri  = 25;          // ~10 to ~40, tune this number to your liking
+const int8_t   MaxBri  = 30;          // ~10 to ~40, tune this number to your liking
 const int8_t HiMinBri  = MaxBri*0.6;  // birghtness of twinkling LED at No Rain // keep it less than MaxBri
 const int8_t LoMinBri  = 0;           // birghtness of twinkling LED at MaxRain
 
@@ -35,11 +35,10 @@ const int8_t LoMinBri  = 0;           // birghtness of twinkling LED at MaxRain
 // We want to use relative temperature otherwise the LED colour will only change with the seasons. All values will be relative to the average value for the day of the year.
 // Day 0 and 366 are Dec 31. Days are the 15th and last day of every month in a non leap year.
 // http://climate.weather.gc.ca/climate_data/almanac_e.html?StationID=3698&period=30&searchMethod=contains&txtStationName=winnipeg&month=12&day=31
-const int16_t NormalDay[]   = {    0,    15,    31,    46,    59,    74,   90,  105,  120,  135,  151,  166,  181,  196,  212,  227,  243,  258,  273,  288,  304,  319,   334,   349,   366};
-const float   NormalLow[]   = {-22.2, -23.2, -21.7, -18.7, -15.5, -11.3, -6.7, -2.4,  1.3,  4.6,  8.0, 10.7, 12.5, 13.4, 13.4, 12.3,  9.4,  6.0,  3.2,  0.1, -4.4, -9.4, -14.6, -19.1, -22.2}; // [°C]
-const float   NormalHigh[]  = {-12.4, -13.2, -11.5,  -8.4,  -5.7,  -1.7,  4.3, 10.2, 15.3, 19.2, 21.8, 23.3, 24.7, 25.8, 26.3, 25.5, 22.4, 18.6, 15.3, 11.4,  5.3, -1.0,  -5.9,  -9.7, -12.4}; // [°C]
+const int16_t NormalDay[]   = {    0,    15,    31,    ,46,    59,   74,  ,90, 105, 120,  135,  151,  166,  181,  196,   212,  227,  243,  258,  273,  288,  304,  319,    334,   349,   366};
+const float   NormalTemp[]  = {-17.3, -18.2, -16.6, -13.55, -10.6, -6.5, -1.2, 3.9, 8.3, 11.9, 14.9, 17.0, 18.6, 19.6, 19.85, 18.9, 15.9, 12.3, 9.25, 5.75, 0.45, -5.2, -10.25, -14.4, -17.3}; // [°C]
 const float   MaxWind       = 8.33; // [m/s] // https://winnipeg.weatherstats.ca/charts/wind_speed-monthly.html
-const int8_t  OffsetTemp    = 4;    // [°C] degrees to offset normal seasonal highs and lows
+const int8_t  OffsetTemp    = 15;    // [°C] degrees to offset normal seasonal temperature
 const int8_t  WeatherInterval[] = {24, 12, 0};  // Forecast interval shown on each pane. 0 is current weather. Repeats allowed, any order allowed. Intervals are 1 hour each.
 
 // ***** Hardware Config Settings *****
